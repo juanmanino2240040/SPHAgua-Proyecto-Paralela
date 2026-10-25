@@ -1,0 +1,10 @@
+[configuration]
+
+entry_symbol = "sph_fluid_library_init"
+compatibility_minimum = "4.2"
+
+[libraries]
+
+linux.debug.x86_64 = "bin/libsph_fluid_extension.so"
+linux.release.x86_64 = "bin/libsph_fluid_extension.so"
+# (Puedes agregar más plataformas como Windows/macOS aquí cuando las compiles)

@@ -1,0 +1,31 @@
+import json
+import matplotlib.pyplot as plt
+import numpy as np
+f = open("../data/timesteps-global")
+obj = json.loads(f.read())
+print(obj.keys())
+f.close()
+
+
+fig, (ax1) = plt.subplots(1, 1, layout='constrained')
+# log x axis
+
+ax1.grid()
+ax1.grid(which="minor", color="0.9")
+x = [int(x) for x in obj["1.0"].keys()]
+y = np.zeros([len(obj["1.0"].keys())])
+for key in obj.keys():
+    print(np.array([x for x in obj[key].values()]))
+    vals = np.array([x for x in obj[key].values()])
+    y = y + vals
+x2 = [500000, 1000000, 5000000, 10000000, 50000000, 100000000, 500000000, 1000000000]
+y2 = [0.0059,0.0029,0.0017,0.0009,0.0006,0.0002,0.0005,0.0002]
+y3 = [0.0106,0.0059,0.0028,0.003,0.003,0.0009,0.0005,0.0002,]
+y4 = [0.0251,0.0167,0.0104,0.0051,0.003,0.0015,0.0005,0.0003,]
+y5 = [0.0248,0.0208,0.0104,0.0071,0.003,0.0022,0.0009,0.0004,]
+ax1.semilogx(x2, y2, label="nu=0")
+ax1.semilogx(x2, y3, label="nu=0.01")
+ax1.semilogx(x2, y4, label="nu=0.05")
+ax1.semilogx(x2, y5, label="nu=0.1")
+ax1.legend()
+plt.show()

@@ -1,0 +1,104 @@
+[gd_scene format=3 uid="uid://c7gyolk641sq"]
+
+[ext_resource type="Script" uid="uid://ug18l8wsyfsq" path="res://src/scripts/water_omogonix.gd" id="1_7eyso"]
+
+[sub_resource type="Gradient" id="Gradient_4ub7w"]
+colors = PackedColorArray(0.41215247, 0.41215247, 0.41215247, 1, 1, 1, 1, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_50sk0"]
+frequency = 0.03
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_f4s5w"]
+noise = SubResource("FastNoiseLite_50sk0")
+color_ramp = SubResource("Gradient_4ub7w")
+seamless = true
+seamless_blend_skirt = 1.0
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_p8ydi"]
+frequency = 0.03
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_l4gaf"]
+width = 1024
+height = 1024
+noise = SubResource("FastNoiseLite_p8ydi")
+seamless = true
+as_normal_map = true
+seamless_blend_skirt = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_niubb"]
+albedo_color = Color(0.25410178, 0.7000299, 0.79153407, 1)
+albedo_texture = SubResource("NoiseTexture2D_f4s5w")
+roughness = 0.0
+normal_enabled = true
+normal_texture = SubResource("NoiseTexture2D_l4gaf")
+uv1_scale = Vector3(4, 4, 4)
+
+[sub_resource type="QuadMesh" id="QuadMesh_vr8ek"]
+
+[sub_resource type="Animation" id="Animation_uepnt"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("MeshInstance3D:material_override:uv1_offset")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_7eyso"]
+resource_name = "flow"
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("MeshInstance3D:material_override:uv1_offset")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(1, 0, 0)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_qlcs6"]
+_data = {
+&"RESET": SubResource("Animation_uepnt"),
+&"flow": SubResource("Animation_7eyso")
+}
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_niubb"]
+size = Vector3(100, 50, 100)
+
+[node name="WaterExample" type="Node3D" unique_id=57048557]
+script = ExtResource("1_7eyso")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1210680101]
+transform = Transform3D(100, 0, 0, 0, -4.371139e-06, 100, 0, -100, -4.371139e-06, 0, 0, 0)
+material_override = SubResource("StandardMaterial3D_niubb")
+mesh = SubResource("QuadMesh_vr8ek")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1010300765]
+libraries/ = SubResource("AnimationLibrary_qlcs6")
+speed_scale = 0.015
+
+[node name="WaterArea" type="Area3D" parent="." unique_id=592477143]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2.2703667, 0)
+gravity_space_override = 1
+gravity_point_center = Vector3(0, 1, 0)
+gravity_direction = Vector3(0, 1, 0)
+gravity = 10.25
+linear_damp_space_override = 1
+linear_damp = 0.25
+angular_damp_space_override = 1
+angular_damp = 0.25
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WaterArea" unique_id=692359903]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -23.402832, 0)
+shape = SubResource("BoxShape3D_niubb")
+debug_color = Color(0.16078432, 0.6509804, 0.61960787, 1)

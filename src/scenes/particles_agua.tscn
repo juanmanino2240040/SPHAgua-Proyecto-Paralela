@@ -1,0 +1,55 @@
+[gd_scene format=3 uid="uid://d0xcrsn3bl8ym"]
+
+[ext_resource type="Script" uid="uid://b6iwyckm5bh71" path="res://src/scripts/camera_3d.gd" id="1_1vcq0"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_tcd3o"]
+
+[sub_resource type="Sky" id="Sky_7eyso"]
+sky_material = SubResource("ProceduralSkyMaterial_tcd3o")
+
+[sub_resource type="Environment" id="Environment_rbf0i"]
+background_mode = 2
+sky = SubResource("Sky_7eyso")
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_vr8ek"]
+size = Vector3(1, 0.056884766, 1)
+
+[node name="ParticlesAgua" type="Node3D" unique_id=1661422376]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1228014254]
+environment = SubResource("Environment_rbf0i")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=437935736]
+transform = Transform3D(1, 0, 0, 0, 0.796561, 0.60455817, 0, -0.60455817, 0.796561, 0, 0, 0)
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1239139826]
+transform = Transform3D(1, 0, 0, 0, 0.99940807, -0.0344024, 0, 0.0344024, 0.99940807, -0.16079128, 0.57746005, 1.002027)
+script = ExtResource("1_1vcq0")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=601554947]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=822878051]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.47155762, 0)
+shape = SubResource("BoxShape3D_vr8ek")
+
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="StaticBody3D" unique_id=192093266]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, -0.0009929836, -0.52091336)
+shape = SubResource("BoxShape3D_vr8ek")
+
+[node name="CollisionShape3D3" type="CollisionShape3D" parent="StaticBody3D" unique_id=248695654]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, -0.0009929836, 0.52915895)
+shape = SubResource("BoxShape3D_vr8ek")
+
+[node name="CollisionShape3D4" type="CollisionShape3D" parent="StaticBody3D" unique_id=1927862198]
+transform = Transform3D(-4.371139e-08, 1, -4.371139e-08, 0, -4.371139e-08, -1, -1, -4.371139e-08, 1.9106855e-15, -0.49789697, -0.0009929836, -0.0037411451)
+shape = SubResource("BoxShape3D_vr8ek")
+
+[node name="CollisionShape3D5" type="CollisionShape3D" parent="StaticBody3D" unique_id=909963392]
+transform = Transform3D(-4.371139e-08, 1, -4.371139e-08, 0, -4.371139e-08, -1, -1, -4.371139e-08, 1.9106855e-15, 0.50649697, -0.0009929836, -0.0037411451)
+shape = SubResource("BoxShape3D_vr8ek")
+
+[node name="SPHFluidRegion3D" type="SPHFluidRegion3D" parent="." unique_id=1699160399]
+particle_count = 1500
+container_path = NodePath("../StaticBody3D")
+particle_radius = 0.025

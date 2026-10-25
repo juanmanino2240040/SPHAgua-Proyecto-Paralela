@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://5ts333dqr8im"]
+
+[ext_resource type="PackedScene" uid="uid://c7gyolk641sq" path="res://src/scenes/water_omogonix.tscn" id="1_1nrfg"]
+[ext_resource type="Script" uid="uid://b6iwyckm5bh71" path="res://src/scripts/camera_3d.gd" id="2_l310h"]
+[ext_resource type="PackedScene" uid="uid://drolphkvb4jgu" path="res://src/scenes/capsula.tscn" id="2_tqniy"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_co7sb"]
+
+[sub_resource type="Sky" id="Sky_7eyso"]
+sky_material = SubResource("ProceduralSkyMaterial_co7sb")
+
+[sub_resource type="Environment" id="Environment_l310h"]
+background_mode = 2
+sky = SubResource("Sky_7eyso")
+
+[node name="WaterPhysics" type="Node3D" unique_id=1939680510]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1304445481]
+environment = SubResource("Environment_l310h")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=91435049]
+transform = Transform3D(1, 0, 0, 0, 0.796561, 0.60455817, 0, -0.60455817, 0.796561, 0, 0, 0)
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=2041285738]
+transform = Transform3D(1, 0, 0, 0, 0.99940807, -0.0344024, 0, 0.0344024, 0.99940807, 1.9098544, 6.7245255, 9.480385)
+script = ExtResource("2_l310h")
+
+[node name="WaterExample" parent="." unique_id=57048557 instance=ExtResource("1_1nrfg")]
+
+[node name="Cap1" parent="." unique_id=1000028661 instance=ExtResource("2_tqniy")]
+transform = Transform3D(0.76000386, 0.64991856, 0, -0.64991856, 0.76000386, 0, 0, 0, 1, -2.7088652, 10.411924, -5.332774)
+can_sleep = false
+
+[node name="Cap2" parent="." unique_id=1758707917 instance=ExtResource("2_tqniy")]
+transform = Transform3D(0.78437114, 0.62029177, 0, -0.62029177, 0.78437114, 0, 0, 0, 1, -0.37710857, 10.411924, 1.3071775)
+can_sleep = false
+
+[node name="Cap3" parent="." unique_id=951029013 instance=ExtResource("2_tqniy")]
+transform = Transform3D(0.7193761, 0.6946208, 0, -0.6946208, 0.7193761, 0, 0, 0, 1, 3.1989102, 10.411924, -1.8094835)
+can_sleep = false
+
+[node name="Cap4" parent="." unique_id=1712999232 instance=ExtResource("2_tqniy")]
+transform = Transform3D(0.7713853, 0.6363684, 0, -0.6363684, 0.7713853, 0, 0, 0, 1, 6.989547, 10.411924, 3.2034855)
+can_sleep = false

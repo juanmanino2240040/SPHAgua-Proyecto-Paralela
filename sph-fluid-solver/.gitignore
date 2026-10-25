@@ -1,0 +1,10 @@
+build
+out
+.cache
+.idea
+.vs
+.vscode
+tube*
+breakingDam*
+tubeDensity*
+tmp*
