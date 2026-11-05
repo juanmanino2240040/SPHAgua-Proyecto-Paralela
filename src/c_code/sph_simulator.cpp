@@ -44,6 +44,7 @@ void Simulator::simulate_step() {
 }
 
 void Simulator::compute_acceleration() {
+	SPH_PARALLEL_FOR
 	for (int i = 0; i < conf.active_particles; i++) {
 		particles[i].acc = Vec3(0.0, 0.0, 0.0);
 	}
@@ -58,6 +59,7 @@ void Simulator::compute_acceleration() {
 }
 
 void Simulator::compute_external_forces() {
+	SPH_PARALLEL_FOR
 	for (int i = 0; i < conf.active_particles; i++) {
 		particles[i].acc += conf.gravity;
 	}
@@ -65,6 +67,10 @@ void Simulator::compute_external_forces() {
 
 void Simulator::compute_pressure_forces() {
 	// First pass: density and pressure for every fluid particle.
+	// Parallel: iteration i only writes density/pressure of particle i. The
+	// implicit barrier at the end of the loop guarantees every density is ready
+	// before the second pass reads the ones of the neighbours.
+	SPH_PARALLEL_FOR
 	for (int i = 0; i < conf.active_particles; i++) {
 		particles[i].density = 0.0;
 		for (size_t k = 0; k < particles[i].neighbors.size(); k++) {
@@ -74,7 +80,9 @@ void Simulator::compute_pressure_forces() {
 		particles[i].pressure = std::max(conf.k * (particles[i].density - particles[i].rest_density), 0.0);
 	}
 
-	// Second pass: pressure acceleration.
+	// Second pass: pressure acceleration. Parallel: iteration i only writes
+	// particles[i].acc and only reads the (already final) data of its neighbours.
+	SPH_PARALLEL_FOR
 	for (int i = 0; i < conf.active_particles; i++) {
 		for (size_t k = 0; k < particles[i].neighbors.size(); k++) {
 			const int j = particles[i].neighbors[k];
@@ -99,6 +107,7 @@ void Simulator::compute_pressure_forces() {
 }
 
 void Simulator::compute_viscous_forces() {
+	SPH_PARALLEL_FOR
 	for (int i = 0; i < conf.active_particles; i++) {
 		for (size_t k = 0; k < particles[i].neighbors.size(); k++) {
 			const int j = particles[i].neighbors[k];
@@ -139,6 +148,7 @@ void Simulator::compute_surface_tension() {
 void Simulator::perform_update_step() {
 	// Euler-Cromer: update the speed with the current acceleration first, then
 	// advance the position with the new speed.
+	SPH_PARALLEL_FOR
 	for (int i = 0; i < conf.active_particles; i++) {
 		particles[i].speed += particles[i].acc * conf.timestep;
 		particles[i].pos += particles[i].speed * conf.timestep;

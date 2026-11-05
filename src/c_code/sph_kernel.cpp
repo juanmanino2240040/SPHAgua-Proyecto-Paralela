@@ -81,32 +81,54 @@ void Kernel::cell_neighborhood_search(int p_i, int p_gx, int p_gy, int p_gz) {
 }
 
 void Kernel::grid_neighborhood_search() {
+	build_grid();
+	query_neighbors();
+}
+
+void Kernel::build_grid() {
 	// Counting sort of all particles into the uniform grid. Even inactive
 	// (stationary / boundary) particles are inserted so they can be found as
 	// neighbours of the active fluid particles.
+	const int n = conf.particle_count;
+	if (int(cell_of.size()) < n) {
+		cell_of.resize(n);
+	}
+
 	for (int i = 0; i <= grid_max; i++) {
 		grid_count[i] = 0;
 	}
 
-	for (int i = 0; i < conf.particle_count; i++) {
+	// Parallel: every iteration only touches particle i and cell_of[i].
+	SPH_PARALLEL_FOR
+	for (int i = 0; i < n; i++) {
 		particles[i].neighbors.clear();
 		int gx = 0, gy = 0, gz = 0;
-		const int grid_id = cell_index(particles[i].pos, gx, gy, gz);
-		grid_count[grid_id]++;
+		cell_of[i] = cell_index(particles[i].pos, gx, gy, gz);
+	}
+
+	// The counting sort itself stays sequential (concurrent increments of the
+	// same cell). The scatter pass must run in ascending i to keep the order of
+	// the particles inside each cell identical to the sequential solver.
+	for (int i = 0; i < n; i++) {
+		grid_count[cell_of[i]]++;
 	}
 
 	for (int i = 1; i <= grid_max; i++) {
 		grid_count[i] = grid_count[i] + grid_count[i - 1];
 	}
 
-	for (int i = 0; i < conf.particle_count; i++) {
-		int gx = 0, gy = 0, gz = 0;
-		const int grid_id = cell_index(particles[i].pos, gx, gy, gz);
-		grid[--grid_count[grid_id]] = i;
+	for (int i = 0; i < n; i++) {
+		grid[--grid_count[cell_of[i]]] = i;
 	}
+	// Now grid_count[c] holds the first slot of cell c and grid_count[c + 1]
+	// the end of cell c.
+}
 
-	// After the pass above grid_count[c] holds the first slot of cell c and
-	// grid_count[c + 1] the end of cell c.
+void Kernel::query_neighbors() {
+	// Parallel: particle i only appends to its own neighbour list, and the cells
+	// are scanned in the same order as in the sequential version, so the list
+	// (and therefore every later sum) is bit-identical.
+	SPH_PARALLEL_FOR
 	for (int i = 0; i < conf.active_particles; i++) {
 		int gx = 0, gy = 0, gz = 0;
 		cell_index(particles[i].pos, gx, gy, gz);
@@ -151,6 +173,7 @@ std::vector<int> Kernel::specific_neighbor_search(const Vec3 &p_pos) {
 
 void Kernel::calculate_kernel() {
 	const double alpha = get_factor();
+	SPH_PARALLEL_FOR
 	for (int i = 0; i < conf.active_particles; i++) {
 		particles[i].kernel.resize(particles[i].neighbors.size());
 		for (size_t k = 0; k < particles[i].neighbors.size(); k++) {
@@ -169,6 +192,7 @@ void Kernel::calculate_kernel() {
 
 void Kernel::calculate_kernel_derivative() {
 	const double alpha = get_factor();
+	SPH_PARALLEL_FOR
 	for (int i = 0; i < conf.active_particles; i++) {
 		const size_t n = particles[i].neighbors.size();
 		particles[i].kernel_deriv_x.resize(n);

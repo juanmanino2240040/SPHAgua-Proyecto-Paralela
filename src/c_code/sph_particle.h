@@ -11,6 +11,15 @@
 // and stores positions/speeds/accelerations as std::vector<double>; here they
 // are stored in a small double-precision Vec3 so the same math can be used in
 // 3D while keeping the double precision the original solver relies on.
+// Paralelismo de datos con OpenMP. Sin -fopenmp la macro queda vacia y el codigo
+// es exactamente el secuencial (sin avisos de pragma desconocido). Solo se usa
+// en bucles donde cada iteracion escribe unicamente en su propia particula.
+#ifdef _OPENMP
+#define SPH_PARALLEL_FOR _Pragma("omp parallel for schedule(static)")
+#else
+#define SPH_PARALLEL_FOR
+#endif
+
 namespace sph {
 
 struct Vec3 {

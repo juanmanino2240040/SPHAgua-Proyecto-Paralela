@@ -37,6 +37,7 @@ private:
 
 	std::vector<int> grid;
 	std::vector<int> grid_count;
+	std::vector<int> cell_of; // celda de cada particula en el paso actual
 	int grid_nx = 0;
 	int grid_ny = 0;
 	int grid_nz = 0;
@@ -45,6 +46,11 @@ private:
 
 	void quadratic_neighbor_search();
 	void grid_neighborhood_search();
+	// grid_neighborhood_search() = build_grid() + query_neighbors().
+	// build_grid(): ordena todas las particulas por celda (conteo en 3 pasadas).
+	// query_neighbors(): recorre las 27 celdas de cada particula de fluido.
+	void build_grid();
+	void query_neighbors();
 	void cell_neighborhood_search(int p_i, int p_gx, int p_gy, int p_gz);
 
 	// Returns the linear cell index and writes the per-axis cell coordinates.
