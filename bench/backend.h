@@ -59,11 +59,20 @@ public:
 	// cronometros. Sirve para --verify: ambas rutas deben dar el mismo hash.
 	virtual void step_reference() = 0;
 
+	// Espera a que el backend termine el trabajo pendiente (GPU). La CPU no
+	// necesita hacer nada.
+	virtual void synchronize() {}
+
 	virtual Stats stats() = 0;
 };
 
-// name: "cpu". Devuelve nullptr si el backend no existe en esta compilacion.
+// name: "cpu" o "cuda". Devuelve nullptr si el backend no existe en esta
+// compilacion o si no hay una GPU utilizable.
 std::unique_ptr<Backend> make_backend(const std::string &name);
+
+#if defined(SPH_HAS_CUDA)
+std::unique_ptr<Backend> make_cuda_backend();
+#endif
 
 } // namespace bench
 

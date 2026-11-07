@@ -7,6 +7,7 @@
 #include <godot_cpp/classes/shape3d.hpp>
 #include <godot_cpp/classes/sphere_mesh.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include <algorithm>
@@ -86,9 +87,15 @@ void SPHFluidRegion3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_paused"), &SPHFluidRegion3D::get_paused);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "paused"), "set_paused", "get_paused");
 
+	ClassDB::bind_method(D_METHOD("set_use_cuda", "p_value"), &SPHFluidRegion3D::set_use_cuda);
+	ClassDB::bind_method(D_METHOD("get_use_cuda"), &SPHFluidRegion3D::get_use_cuda);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_cuda"), "set_use_cuda", "get_use_cuda");
+
 	ClassDB::bind_method(D_METHOD("get_active_particle_count"), &SPHFluidRegion3D::get_active_particle_count);
 	ClassDB::bind_method(D_METHOD("get_average_density"), &SPHFluidRegion3D::get_average_density);
 	ClassDB::bind_method(D_METHOD("reset_simulation"), &SPHFluidRegion3D::reset_simulation);
+	ClassDB::bind_method(D_METHOD("is_using_cuda"), &SPHFluidRegion3D::is_using_cuda);
+	ClassDB::bind_method(D_METHOD("get_backend_name"), &SPHFluidRegion3D::get_backend_name);
 }
 
 void SPHFluidRegion3D::_notification(int p_what) {
@@ -304,6 +311,20 @@ void SPHFluidRegion3D::build_particles(const AABB &p_bounds) {
 	kernel = sph::Kernel(simulator.get_conf());
 	kernel.initialize(simulator.get_particle_data());
 	simulator.set_kernel(&kernel);
+
+	// El solver CPU queda siempre preparado como fallback: si CUDA no esta
+	// disponible (o falla en caliente) la simulacion continua sin congelarse.
+	// La GPU recibe una copia de las particulas ya particionadas por el solver
+	// CPU (fluido primero), no las `parts` originales.
+	cuda_active = false;
+	if (use_cuda) {
+		cuda_active = cuda_solver.initialize(conf, simulator.get_particles());
+		if (cuda_active) {
+			UtilityFunctions::print("SPH backend CUDA activo (", cuda_solver.total_particles(), " particulas en GPU).");
+		} else {
+			UtilityFunctions::print("SPH CUDA no disponible: ", cuda_solver.error(), ". Usando CPU.");
+		}
+	}
 }
 
 void SPHFluidRegion3D::create_multimesh() {
@@ -313,7 +334,7 @@ void SPHFluidRegion3D::create_multimesh() {
 
 	multimesh.instantiate();
 	multimesh->set_transform_format(MultiMesh::TRANSFORM_3D);
-	multimesh->set_instance_count(std::max(1, simulator.get_conf().active_particles));
+	multimesh->set_instance_count(std::max(1, current_active_particles()));
 
 	Ref<SphereMesh> sphere_mesh;
 	sphere_mesh.instantiate();
@@ -330,23 +351,52 @@ void SPHFluidRegion3D::update_multimesh() {
 		return;
 	}
 
-	const std::vector<sph::Particle> &parts = simulator.get_particles();
-	const int active = std::min<int>(simulator.get_conf().active_particles, int(parts.size()));
-
-	if (multimesh->get_instance_count() != active) {
-		multimesh->set_instance_count(std::max(1, active));
-	}
-
 	// Particle positions are stored in world space; instance transforms are
 	// relative to this node.
 	const Transform3D inv = get_global_transform().affine_inverse();
 
-	for (int i = 0; i < active; ++i) {
-		const sph::Vec3 &p = parts[i].pos;
-		Transform3D t;
-		t.origin = inv.xform(Vector3(float(p.x), float(p.y), float(p.z)));
-		multimesh->set_instance_transform(i, t);
+	// Se escribe el buffer TRANSFORM_3D de golpe (12 floats por instancia:
+	// 3 filas de la matriz, con base identidad y origen transformado). Es mucho
+	// mas barato que llamar a set_instance_transform() una vez por particula,
+	// sobre todo con miles de ellas.
+	int active = 0;
+	if (cuda_active) {
+		active = cuda_solver.copy_positions(cuda_positions);
+	} else {
+		active = std::min<int>(current_active_particles(), int(simulator.get_particles().size()));
 	}
+
+	if (multimesh->get_instance_count() != std::max(1, active)) {
+		multimesh->set_instance_count(std::max(1, active));
+	}
+	if (active <= 0) {
+		return;
+	}
+
+	PackedFloat32Array buffer;
+	buffer.resize(int64_t(active) * 12);
+	float *out = buffer.ptrw();
+
+	const std::vector<sph::Particle> &parts = simulator.get_particles();
+	for (int i = 0; i < active; ++i) {
+		const sph::Vec3 &pos = cuda_active ? cuda_positions[size_t(i)] : parts[size_t(i)].pos;
+		const Vector3 origin = inv.xform(Vector3(float(pos.x), float(pos.y), float(pos.z)));
+		float *m = out + size_t(i) * 12;
+		m[0] = 1.0f;
+		m[1] = 0.0f;
+		m[2] = 0.0f;
+		m[3] = origin.x;
+		m[4] = 0.0f;
+		m[5] = 1.0f;
+		m[6] = 0.0f;
+		m[7] = origin.y;
+		m[8] = 0.0f;
+		m[9] = 0.0f;
+		m[10] = 1.0f;
+		m[11] = origin.z;
+	}
+
+	multimesh->set_buffer(buffer);
 }
 
 void SPHFluidRegion3D::_ready() {
@@ -365,8 +415,8 @@ void SPHFluidRegion3D::_ready() {
 	time_accumulator = 0.0;
 	initialized = true;
 
-	UtilityFunctions::print("SPH: ", simulator.get_conf().particle_count, " particulas (",
-			simulator.get_conf().active_particles, " fluido), h = ", resolved_h, ".");
+	UtilityFunctions::print("SPH: ", current_total_particles(), " particulas (", current_active_particles(),
+			" fluido), h = ", resolved_h, ", backend = ", get_backend_name(), ".");
 }
 
 void SPHFluidRegion3D::_process(double delta) {
@@ -381,10 +431,22 @@ void SPHFluidRegion3D::_process(double delta) {
 
 		int steps = 0;
 		while (time_accumulator >= dt && steps < max_substeps) {
-			simulator.simulate_step();
+			if (cuda_active) {
+				cuda_solver.simulate_step();
+				// Si la GPU falla en caliente, seguimos con el solver CPU que ya
+				// quedo inicializado en _ready().
+				if (!cuda_solver.is_initialized()) {
+					UtilityFunctions::print("SPH CUDA fallo en ejecucion: ", cuda_solver.error(),
+							". Cambiando a CPU.");
+					cuda_active = false;
+				}
+			}
+			if (!cuda_active) {
+				simulator.simulate_step();
+			}
 			time_accumulator -= dt;
 			steps++;
-			if (simulator.get_conf().active_particles <= 0) {
+			if (current_active_particles() <= 0) {
 				break;
 			}
 		}
@@ -429,6 +491,7 @@ void SPHFluidRegion3D::set_stiffness(double p_value) {
 	stiffness = p_value;
 	if (initialized) {
 		simulator.get_conf().k = p_value;
+		cuda_solver.get_conf().k = p_value;
 	}
 }
 
@@ -440,6 +503,7 @@ void SPHFluidRegion3D::set_viscosity(double p_value) {
 	viscosity = p_value;
 	if (initialized) {
 		simulator.get_conf().nu = p_value;
+		cuda_solver.get_conf().nu = p_value;
 	}
 }
 
@@ -459,6 +523,7 @@ void SPHFluidRegion3D::set_timestep(double p_value) {
 	timestep = p_value;
 	if (initialized) {
 		simulator.get_conf().timestep = p_value;
+		cuda_solver.get_conf().timestep = p_value;
 	}
 }
 
@@ -478,6 +543,7 @@ void SPHFluidRegion3D::set_gravity(const Vector3 &p_value) {
 	gravity = p_value;
 	if (initialized) {
 		simulator.get_conf().gravity = to_sph(p_value);
+		cuda_solver.get_conf().gravity = to_sph(p_value);
 	}
 }
 
@@ -529,6 +595,13 @@ void SPHFluidRegion3D::set_remove_escaped_particles(bool p_value) {
 	remove_escaped_particles = p_value;
 	if (initialized) {
 		simulator.get_conf().remove_escaped = p_value;
+		cuda_solver.get_conf().remove_escaped = p_value;
+		// El backend CUDA implementa el modo "contenedor cerrado" (clamp).
+		// Para eliminar particulas de verdad usamos el solver CPU.
+		if (p_value && cuda_active) {
+			UtilityFunctions::print("SPH: remove_escaped_particles no esta soportado en CUDA; cambiando a CPU.");
+			cuda_active = false;
+		}
 	}
 }
 
@@ -544,12 +617,40 @@ bool SPHFluidRegion3D::get_paused() const {
 	return paused;
 }
 
+void SPHFluidRegion3D::set_use_cuda(bool p_value) {
+	use_cuda = p_value;
+	// Se aplica al reiniciar la simulacion para no mezclar estados GPU/CPU.
+}
+
+bool SPHFluidRegion3D::get_use_cuda() const {
+	return use_cuda;
+}
+
 int SPHFluidRegion3D::get_active_particle_count() const {
-	return simulator.get_conf().active_particles;
+	return current_active_particles();
 }
 
 double SPHFluidRegion3D::get_average_density() const {
+	if (cuda_active) {
+		return cuda_solver.average_density();
+	}
 	return const_cast<SPHFluidRegion3D *>(this)->simulator.get_average_density();
+}
+
+bool SPHFluidRegion3D::is_using_cuda() const {
+	return cuda_active;
+}
+
+String SPHFluidRegion3D::get_backend_name() const {
+	return cuda_active ? String("cuda") : String("cpu");
+}
+
+int SPHFluidRegion3D::current_active_particles() const {
+	return cuda_active ? cuda_solver.active_particles() : simulator.get_conf().active_particles;
+}
+
+int SPHFluidRegion3D::current_total_particles() const {
+	return cuda_active ? cuda_solver.total_particles() : simulator.get_conf().particle_count;
 }
 
 void SPHFluidRegion3D::reset_simulation() {
@@ -559,6 +660,7 @@ void SPHFluidRegion3D::reset_simulation() {
 		multimesh_instance = nullptr;
 	}
 	multimesh.unref();
+	cuda_active = false;
 	initialized = false;
 	_ready();
 }

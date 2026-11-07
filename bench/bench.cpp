@@ -13,6 +13,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <stdexcept>
 #include <string>
 
 #ifdef _OPENMP
@@ -52,7 +53,7 @@ void usage(const char *argv0) {
 			"  --warmup W           pasos previos NO medidos (def. 20)\n"
 			"  --repeat R           repetir la corrida R veces desde cero (def. 1)\n"
 			"  --threads T          hilos OpenMP (solo si se compilo con OMP=1)\n"
-			"  --backend NAME       cpu (def.)\n"
+			"  --backend NAME       cpu (def.) o cuda (si se compilo con CUDA=1)\n"
 			"  --csv FILE           anade una fila por corrida al CSV (crea la cabecera)\n"
 			"  --quiet              no imprime el resumen legible\n"
 			"\n"
@@ -197,7 +198,7 @@ int run_verify(const Options &o) {
 	auto a = bench::make_backend(o.backend);
 	auto b = bench::make_backend(o.backend);
 	if (!a || !b) {
-		std::fprintf(stderr, "Backend desconocido: %s\n", o.backend.c_str());
+		std::fprintf(stderr, "Backend no disponible: %s (¿compilado sin CUDA=1 o GPU incompatible?)\n", o.backend.c_str());
 		return 2;
 	}
 	a->init(bench::build_scene(o.scene));
@@ -235,8 +236,13 @@ int main(int argc, char **argv) {
 
 	if (o.info) {
 		auto be = bench::make_backend(o.backend);
-		std::printf("backend %s\nomp %d\nmax_threads %d\n", o.backend.c_str(), compiled_with_openmp(), be ? be->threads() : 1);
-		return be ? 0 : 2;
+		if (!be) {
+			std::fprintf(stderr, "Backend no disponible: %s%s\n", o.backend.c_str(),
+					o.backend == "cuda" ? " (compilado sin CUDA=1 o GPU incompatible)" : "");
+			return 2;
+		}
+		std::printf("backend %s\nomp %d\nmax_threads %d\n", o.backend.c_str(), compiled_with_openmp(), be->threads());
+		return 0;
 	}
 	if (o.verify) {
 		return run_verify(o);
@@ -248,66 +254,83 @@ int main(int argc, char **argv) {
 	for (int rep = 1; rep <= o.repeat; ++rep) {
 		auto be = bench::make_backend(o.backend);
 		if (!be) {
-			std::fprintf(stderr, "Backend desconocido: %s\n", o.backend.c_str());
+			std::fprintf(stderr, "Backend no disponible: %s%s\n", o.backend.c_str(),
+					o.backend == "cuda" ? " (compilado sin CUDA=1 o GPU incompatible)" : "");
 			return 2;
 		}
-		bench::Scene scene = bench::build_scene(o.scene);
-		const double h = scene.h;
-		const double dt = scene.conf.timestep;
-		be->init(std::move(scene));
+		try {
+			bench::Scene scene = bench::build_scene(o.scene);
+			const double h = scene.h;
+			const double dt = scene.conf.timestep;
+			be->init(std::move(scene));
 
-		for (int s = 0; s < o.warmup; ++s) {
-			be->step(nullptr);
-		}
-
-		bench::PhaseTimes pt;
-		const auto t0 = clk::now();
-		for (int s = 0; s < o.steps; ++s) {
-			be->step(&pt);
-		}
-		const auto t1 = clk::now();
-		const double wall_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-
-		const bench::Stats st = be->stats();
-		const double n = double(o.steps);
-		const int total = st.active + st.boundary;
-
-		if (!st.finite || st.avg_neighbors > 45.0) {
-			std::fprintf(stderr,
-					"AVISO: posible inestabilidad numerica (vecinos medios=%.1f, finito=%d). Los tiempos no son representativos; reduce --dt.\n",
-					st.avg_neighbors, int(st.finite));
-			exit_code = 3;
-		}
-
-		if (!o.quiet) {
-			auto pr = [&](const char *label, double ms) {
-				std::printf("  %-26s %10.4f ms/paso  %5.1f %%\n", label, ms / n, 100.0 * ms / pt.total());
-			};
-			std::printf("[%s] repeticion %d/%d  hilos=%d  omp=%d\n", be->name(), rep, o.repeat, be->threads(), compiled_with_openmp());
-			std::printf("  h=%.5f  dt=%.6g  fluido=%d  frontera=%d  total=%d  vecinos medios=%.1f\n", h, dt, st.active, st.boundary, total, st.avg_neighbors);
-			pr("vecinos: rejilla (orden)", pt.grid);
-			pr("vecinos: consulta 27 celdas", pt.query);
-			pr("kernel W", pt.kernel);
-			pr("gradiente dW", pt.kernel_deriv);
-			pr("presion", pt.pressure);
-			pr("viscosidad", pt.viscosity);
-			pr("integracion", pt.integrate);
-			pr("limites", pt.bounds);
-			pr("otros", pt.other);
-			std::printf("  TOTAL (reloj de pared)     %10.4f ms/paso   (%d pasos medidos, %.1f ms)\n", wall_ms / n, o.steps, wall_ms);
-			std::printf("  densidad media=%.2f  cfl=%.4g  hash=%016llx\n", st.avg_density, st.cfl, (unsigned long long)st.hash);
-		}
-
-		if (!o.csv.empty()) {
-			char row[1024];
-			std::snprintf(row, sizeof(row),
-					"%s,%d,%d,%d,%d,%d,%d,%.9g,%.9g,%d,%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.3f,%.6f,%.6g,%d,%.12g,%016llx",
-					be->name(), compiled_with_openmp(), be->threads(), o.scene.particle_count, st.active, st.boundary, total, h, dt, o.steps, rep,
-					wall_ms / n, pt.grid / n, pt.query / n, pt.kernel / n, pt.kernel_deriv / n, pt.pressure / n, pt.viscosity / n, pt.integrate / n,
-					pt.bounds / n, pt.other / n, st.avg_neighbors, st.avg_density, st.cfl, int(st.finite), st.checksum, (unsigned long long)st.hash);
-			if (!append_csv(o.csv, row)) {
-				exit_code = 4;
+			for (int s = 0; s < o.warmup; ++s) {
+				be->step(nullptr);
 			}
+			// El calentamiento puede haber dejado trabajo asincrono en la GPU:
+			// no debe entrar en la medida.
+			be->synchronize();
+
+			bench::PhaseTimes pt;
+			const auto t0 = clk::now();
+			for (int s = 0; s < o.steps; ++s) {
+				be->step(&pt);
+			}
+			be->synchronize(); // espera a que la GPU termine antes de parar el reloj
+			const auto t1 = clk::now();
+			const double wall_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+
+			const bench::Stats st = be->stats();
+			const double n = double(o.steps);
+			const int total = st.active + st.boundary;
+			const double phase_total = pt.total();
+
+			if (st.active <= 0) {
+				std::fprintf(stderr, "ERROR: el backend no tiene particulas activas (revisa la escena).\n");
+				return 2;
+			}
+
+			if (!st.finite || st.avg_neighbors > 45.0) {
+				std::fprintf(stderr,
+						"AVISO: posible inestabilidad numerica (vecinos medios=%.1f, finito=%d). Los tiempos no son representativos; reduce --dt.\n",
+						st.avg_neighbors, int(st.finite));
+				exit_code = 3;
+			}
+
+			if (!o.quiet) {
+				auto pr = [&](const char *label, double ms) {
+					const double pct = phase_total > 0.0 ? 100.0 * ms / phase_total : 0.0;
+					std::printf("  %-26s %10.4f ms/paso  %5.1f %%\n", label, ms / n, pct);
+				};
+				std::printf("[%s] repeticion %d/%d  hilos=%d  omp=%d\n", be->name(), rep, o.repeat, be->threads(), compiled_with_openmp());
+				std::printf("  h=%.5f  dt=%.6g  fluido=%d  frontera=%d  total=%d  vecinos medios=%.1f\n", h, dt, st.active, st.boundary, total, st.avg_neighbors);
+				pr("vecinos: rejilla (orden)", pt.grid);
+				pr("vecinos: consulta 27 celdas", pt.query);
+				pr("kernel W (+densidad/pres.)", pt.kernel);
+				pr("gradiente dW", pt.kernel_deriv);
+				pr("presion", pt.pressure);
+				pr("viscosidad", pt.viscosity);
+				pr("integracion", pt.integrate);
+				pr("limites", pt.bounds);
+				pr("otros", pt.other);
+				std::printf("  TOTAL (reloj de pared)     %10.4f ms/paso   (%d pasos medidos, %.1f ms)\n", wall_ms / n, o.steps, wall_ms);
+				std::printf("  densidad media=%.2f  cfl=%.4g  hash=%016llx\n", st.avg_density, st.cfl, (unsigned long long)st.hash);
+			}
+
+			if (!o.csv.empty()) {
+				char row[1024];
+				std::snprintf(row, sizeof(row),
+						"%s,%d,%d,%d,%d,%d,%d,%.9g,%.9g,%d,%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.3f,%.6f,%.6g,%d,%.12g,%016llx",
+						be->name(), compiled_with_openmp(), be->threads(), o.scene.particle_count, st.active, st.boundary, total, h, dt, o.steps, rep,
+						wall_ms / n, pt.grid / n, pt.query / n, pt.kernel / n, pt.kernel_deriv / n, pt.pressure / n, pt.viscosity / n, pt.integrate / n,
+						pt.bounds / n, pt.other / n, st.avg_neighbors, st.avg_density, st.cfl, int(st.finite), st.checksum, (unsigned long long)st.hash);
+				if (!append_csv(o.csv, row)) {
+					exit_code = 4;
+				}
+			}
+		} catch (const std::exception &e) {
+			std::fprintf(stderr, "ERROR en el backend %s: %s\n", o.backend.c_str(), e.what());
+			return 2;
 		}
 	}
 	return exit_code;

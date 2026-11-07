@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cgltgcl4kith8"
+
+[deps]
+
+files=["res://results/run.omp.translation", "res://results/run.threads.translation", "res://results/run.particles.translation", "res://results/run.fluid.translation", "res://results/run.boundary.translation", "res://results/run.total.translation", "res://results/run.h.translation", "res://results/run.dt.translation", "res://results/run.steps.translation", "res://results/run.repeat.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.avg.translation", "res://results/run.avg.translation", "res://results/run.cfl.translation", "res://results/run.finite.translation", "res://results/run.checksum.translation", "res://results/run.hash.translation"]
+
+source_file="res://results/run.csv"
+dest_files=["res://results/run.omp.translation", "res://results/run.threads.translation", "res://results/run.particles.translation", "res://results/run.fluid.translation", "res://results/run.boundary.translation", "res://results/run.total.translation", "res://results/run.h.translation", "res://results/run.dt.translation", "res://results/run.steps.translation", "res://results/run.repeat.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.ms.translation", "res://results/run.avg.translation", "res://results/run.avg.translation", "res://results/run.cfl.translation", "res://results/run.finite.translation", "res://results/run.checksum.translation", "res://results/run.hash.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

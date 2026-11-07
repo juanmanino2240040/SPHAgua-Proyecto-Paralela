@@ -10,6 +10,7 @@ tiempos se toman aquí.
 cd bench
 make                 # secuencial  -> build/serial/sph_bench   (línea base)
 make OMP=1           # con OpenMP  -> build/omp/sph_bench
+make CUDA=1          # backend GPU -> build/cuda/sph_bench (requiere nvcc)
 make run             # corrida de ejemplo (escena original, 1500 partículas)
 make verify          # comprobación de coherencia (ver abajo)
 ```
@@ -32,6 +33,7 @@ Los dos binarios usan **los mismos fuentes** del solver; solo cambia `-fopenmp`.
 | `--steps S` / `--warmup W` | pasos medidos / pasos previos no medidos (def. 200 / 20) |
 | `--repeat R` | repite la corrida R veces desde cero |
 | `--threads T` | hilos OpenMP (solo con `make OMP=1`) |
+| `--backend NAME` | `cpu` (def.) o `cuda` (solo si se compiló con `CUDA=1`) |
 | `--csv FILE` | añade una fila por corrida (crea la cabecera si hace falta) |
 | `--fill`, `--stiffness`, `--viscosity`, `--bounds`, `--no-boundary` | parámetros de la escena |
 | `--verify` | la ruta cronometrada debe dar el mismo hash que `Simulator::simulate_step()` |
@@ -102,13 +104,32 @@ Para usarlo en Godot hay que compilar la extensión con `-fopenmp` (en `SConstru
 `env.Append(CXXFLAGS=["-fopenmp"])` y `env.Append(LINKFLAGS=["-fopenmp"])`). Sin eso,
 Godot sigue ejecutando la versión secuencial. El benchmark no depende de ello.
 
-## CUDA (siguiente)
+## CUDA
 
-`backend.h` define la interfaz (`init`, `step`, `stats`). Un backend `cuda` se
-añadiría como otro fichero (`backend_cuda.cu`) y se elegiría con `--backend cuda`,
-recibiendo la misma `Scene` y devolviendo las mismas estadísticas. Para que sea
-viable conviene antes pasar los `std::vector` por partícula a arreglos planos (SoA)
-y listas de vecinos compactas (CSR).
+El backend CUDA se compila con `make CUDA=1` (usa `nvcc`; variables `NVCC`,
+`CUDA_ARCH`, `CUDA_HOME`) y se ejecuta con `--backend cuda`:
+
+```bash
+make CUDA=1
+./build/cuda/sph_bench --backend cuda --particles 8000 --steps 200 --repeat 5
+```
+
+Sin `CUDA=1`, `make_backend("cuda")` devuelve `nullptr` y el programa sale con
+código 2. El adaptador está en `backend_cuda.cu` y envuelve `sph::CudaSolver`
+(`src/c_code/sph_cuda.cu`): mismos `init`/`step`/`stats`, pero con física
+`float32`, tope de 128 vecinos y varias etapas fusionadas por kernel. El `hash`
+no coincide con la CPU; compara `checksum`, densidad media, vecinos y `cfl`.
+
+El `ms_step` de la GPU sincroniza al final del tramo medido (y tras el
+calentamiento). Los tiempos por fase salen de eventos CUDA y obligan a
+sincronizar cada paso, así que sirven para ver el reparto, no para medir el
+*throughput* máximo. `ms_kernel` incluye W+densidad+presión y `ms_kernel_deriv`
+queda en 0; ver `CUDA.md` en la raíz del repo.
+
+**GPU Maxwell (940MX):** CUDA 13 no genera `sm_50`; usa CUDA 12.x con
+`make CUDA=1 CUDA_ARCH=sm_50`. Con CUDA 13 el backend no está disponible en
+esa GPU y el nodo de Godot cae automáticamente a CPU.
+
 
 ## Limitaciones conocidas
 

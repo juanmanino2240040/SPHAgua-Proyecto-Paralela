@@ -154,6 +154,13 @@ std::unique_ptr<Backend> make_backend(const std::string &name) {
 	if (name == "cpu") {
 		return std::make_unique<CpuBackend>();
 	}
+	if (name == "cuda") {
+#if defined(SPH_HAS_CUDA)
+		return make_cuda_backend();
+#else
+		return nullptr;
+#endif
+	}
 	return nullptr;
 }
 

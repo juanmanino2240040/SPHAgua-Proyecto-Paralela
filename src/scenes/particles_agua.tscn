@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://d0xcrsn3bl8ym"]
 
 [ext_resource type="Script" uid="uid://b6iwyckm5bh71" path="res://src/scripts/camera_3d.gd" id="1_1vcq0"]
+[ext_resource type="Script" uid="uid://2q8pb6ontx4e" path="res://src/scripts/fps.gd" id="2_1vcq0"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_tcd3o"]
 
@@ -50,6 +51,13 @@ transform = Transform3D(-4.371139e-08, 1, -4.371139e-08, 0, -4.371139e-08, -1, -
 shape = SubResource("BoxShape3D_vr8ek")
 
 [node name="SPHFluidRegion3D" type="SPHFluidRegion3D" parent="." unique_id=1699160399]
-particle_count = 1500
+particle_count = 4000
 container_path = NodePath("../StaticBody3D")
 particle_radius = 0.025
+use_cuda = false
+
+[node name="Label" type="Label" parent="." unique_id=1857963563]
+offset_right = 40.0
+offset_bottom = 23.0
+text = "asdasd"
+script = ExtResource("2_1vcq0")

@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cfha2yxd03bec"
+
+[deps]
+
+files=["res://results/todo.omp.translation", "res://results/todo.threads.translation", "res://results/todo.particles.translation", "res://results/todo.fluid.translation", "res://results/todo.boundary.translation", "res://results/todo.total.translation", "res://results/todo.h.translation", "res://results/todo.dt.translation", "res://results/todo.steps.translation", "res://results/todo.repeat.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.avg.translation", "res://results/todo.avg.translation", "res://results/todo.cfl.translation", "res://results/todo.finite.translation", "res://results/todo.checksum.translation", "res://results/todo.hash.translation"]
+
+source_file="res://results/todo.csv"
+dest_files=["res://results/todo.omp.translation", "res://results/todo.threads.translation", "res://results/todo.particles.translation", "res://results/todo.fluid.translation", "res://results/todo.boundary.translation", "res://results/todo.total.translation", "res://results/todo.h.translation", "res://results/todo.dt.translation", "res://results/todo.steps.translation", "res://results/todo.repeat.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.ms.translation", "res://results/todo.avg.translation", "res://results/todo.avg.translation", "res://results/todo.cfl.translation", "res://results/todo.finite.translation", "res://results/todo.checksum.translation", "res://results/todo.hash.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

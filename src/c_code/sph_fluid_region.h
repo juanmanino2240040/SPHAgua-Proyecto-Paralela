@@ -8,8 +8,11 @@
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
+#include "sph_cuda.h"
 #include "sph_kernel.h"
 #include "sph_simulator.h"
+
+#include <vector>
 
 namespace godot {
 
@@ -25,8 +28,13 @@ private:
 	// --- Solver core ---
 	sph::Simulator simulator;
 	sph::Kernel kernel;
+	sph::CudaSolver cuda_solver;
 	bool initialized = false;
+	bool cuda_active = false;
 	double time_accumulator = 0.0;
+
+	// Buffer reutilizable para copiar las posiciones GPU -> host cada frame.
+	std::vector<sph::Vec3> cuda_positions;
 
 	// --- Rendering ---
 	MultiMeshInstance3D *multimesh_instance = nullptr;
@@ -49,6 +57,7 @@ private:
 	int max_substeps = 32;
 	bool remove_escaped_particles = false;
 	bool paused = false;
+	bool use_cuda = true; // intenta GPU; si no hay, usa CPU automaticamente
 
 	// --- Resolved at _ready() ---
 	double resolved_h = 0.1;
@@ -60,6 +69,10 @@ private:
 	void update_multimesh();
 	double resolve_spacing(const AABB &p_bounds) const;
 	sph::Vec3 to_sph(const Vector3 &p_v) const;
+
+	// Numero de particulas activas/totales del backend que este en uso.
+	int current_active_particles() const;
+	int current_total_particles() const;
 
 protected:
 	static void _bind_methods();
@@ -119,10 +132,15 @@ public:
 	void set_paused(bool p_value);
 	bool get_paused() const;
 
+	void set_use_cuda(bool p_value);
+	bool get_use_cuda() const;
+
 	// Runtime helpers exposed to GDScript / the editor.
 	int get_active_particle_count() const;
 	double get_average_density() const;
 	void reset_simulation();
+	bool is_using_cuda() const;
+	String get_backend_name() const;
 
 	void _ready() override;
 	void _process(double delta) override;

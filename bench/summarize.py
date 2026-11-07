@@ -77,7 +77,9 @@ def main():
             if any(r["finite"] != "1" for r in rs):
                 check += "  [NaN/inf!]"
                 unstable = True
-            print(f"{backend:7} {n:7d} {fluid:7d} {'omp' if omp else 'serie':>6} {thr:5d} {t:9.3f} {tmin:9.3f} {speedup:8.2f} {100 * speedup / thr:5.0f}% {1000 * t / fluid:9.3f}  {check}")
+            # En GPU no hay "hilos", asi que la eficiencia no aplica.
+            eff = f"{100 * speedup / thr:5.0f}%" if thr > 0 else "  gpu"
+            print(f"{backend:7} {n:7d} {fluid:7d} {'omp' if omp else 'serie':>6} {thr:5d} {t:9.3f} {tmin:9.3f} {speedup:8.2f} {eff:>6} {1000 * t / fluid:9.3f}  {check}")
             if args.phases:
                 tot = sum(med(rs, f"ms_{c}") for c, _ in PHASES if f"ms_{c}" in rs[0])
                 parts = "  ".join(f"{label} {100 * med(rs, f'ms_{c}') / tot:4.1f}%" for c, label in PHASES[:6] if f'ms_{c}' in rs[0])
